@@ -20,3 +20,6 @@ app.post('/save-info', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+const cors = require('cors');
+app.use(cors());
