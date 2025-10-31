@@ -28,11 +28,3 @@ app.post('/save-info', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-
-app.get('/view-logs', (req, res) => {
-  fs.readFile('babft.txt', 'utf8', (err, data) => {
-    if (err) return res.status(500).send('No logs yet');
-    res.type('text/plain').send(data);
-  });
-});
-
