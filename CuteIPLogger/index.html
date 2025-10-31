@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tvoje IP</title>
+  <style>
+    :root{
+      --bg: #0f172a;
+      --card: #0b1220;
+      --accent: #7c3aed;
+      --text: #e6edf3;
+    }
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(180deg,#071020 0%, var(--bg) 100%);
+      color:var(--text);
+    }
+    .wrap{
+      min-height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      box-sizing:border-box;
+    }
+    .card{
+      width:100%;
+      max-width:980px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:18px;
+      padding:36px;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.7);
+      text-align:center;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .label {
+      font-size:16px;
+      opacity:0.7;
+      margin-bottom: 16px;
+    }
+
+    .ip {
+      font-weight:800;
+      font-size: clamp(32px, 9vw, 120px); /* big responsive */
+      line-height:1;
+      letter-spacing: -0.02em;
+      color:var(--text);
+      margin: 8px 0 12px;
+      word-break:break-all;
+    }
+
+    .meta {
+      margin-top:14px;
+      color: rgba(230,237,243,0.8);
+      font-size:14px;
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .btn {
+      margin-left:8px;
+      padding:8px 12px;
+      border-radius:10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.03);
+      color:var(--text);
+      cursor:pointer;
+      font-weight:600;
+    }
+
+    .small {
+      font-size:13px;
+      opacity:0.8;
+    }
+
+    .danger {
+      color:#ff7b7b;
+    }
+
+    .spinner {
+      display:inline-block;
+      width:16px;
+      height:16px;
+      border:2px solid rgba(255,255,255,0.12);
+      border-top-color:var(--accent);
+      border-radius:50%;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    footer{ margin-top:18px; font-size:12px; color: rgba(230,237,243,0.6) }
+    a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="main" aria-live="polite">
+      <div class="label">Tvoje veřejná IP adresa je</div>
+
+      <div id="ip" class="ip">
+        <span class="spinner" aria-hidden="true"></span>
+      </div>
+
+      <div class="meta">
+        <div class="small" id="info">Zjišťování…</div>
+
+        <button id="copyBtn" class="btn" style="display:none" aria-label="Zkopírovat IP">
+          Kopírovat IP
+        </button>
+
+        <button id="refreshBtn" class="btn" title="Aktualizovat" aria-label="Aktualizovat">
+          Aktualizovat
+        </button>
+      </div>
+
+      <footer>
+        Použití: pouze na tvém vlastním webu nebo s výslovným svolením návštěvníků. <span class="danger">Nezveřejňuj IP jiné osoby bez jejich souhlasu.</span>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const ipEl = document.getElementById('ip');
+    const infoEl = document.getElementById('info');
+    const copyBtn = document.getElementById('copyBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+
+    async function fetchIP() {
+      ipEl.innerHTML = '<span class="spinner" aria-hidden="true"></span>';
+      infoEl.textContent = 'Zjišťování…';
+      copyBtn.style.display = 'none';
+
+      try {
+        // primární: ipify (rychlé, jen IP)
+        const r = await fetch('https://api.ipify.org?format=json', {cache: 'no-store'});
+        if (!r.ok) throw new Error('ipify failed');
+
+        const data = await r.json();
+        const ip = data.ip || 'N/A';
+        ipEl.textContent = ip;
+        infoEl.textContent = 'Veřejná IP (zjistěno přes ipify.org)';
+
+        // zobraz další info (volitelně) bez blokování UI - snaží se zjistit lokaci atp.
+        // použijeme ipinfo jako doplněk (nepovinné)
+        try {
+          const meta = await fetch('https://ipinfo.io/json?token='); // token není nutný pro základ, ale může mít rate limits
+          if (meta.ok) {
+            const metaJson = await meta.json();
+            if (metaJson.city || metaJson.country) {
+              infoEl.textContent = `Lokace: ${metaJson.city || '—'}, ${metaJson.region || '—'} ${metaJson.country || ''} — provider: ${metaJson.org || '—'}`;
+            }
+          }
+        } catch(e){ /* ignore metadata errors */ }
+
+        copyBtn.style.display = 'inline-block';
+      } catch (err) {
+        ipEl.textContent = 'Není dostupná';
+        infoEl.textContent = 'Nepodařilo se získat IP. Zkontroluj připojení nebo CORS omezení.';
+      }
+    }
+
+    copyBtn.addEventListener('click', async () => {
+      const txt = ipEl.textContent.trim();
+      try {
+        await navigator.clipboard.writeText(txt);
+        copyBtn.textContent = 'Zkopírováno ✓';
+        setTimeout(()=>copyBtn.textContent = 'Kopírovat IP', 1500);
+      } catch(e) {
+        // fallback
+        const ta = document.createElement('textarea');
+        ta.value = txt;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        copyBtn.textContent = 'Zkopírováno ✓';
+        setTimeout(()=>copyBtn.textContent = 'Kopírovat IP', 1500);
+      }
+    });
+
+    refreshBtn.addEventListener('click', fetchIP);
+
+    // inicializace
+    fetchIP();
+  </script>
+</body>
+</html>
